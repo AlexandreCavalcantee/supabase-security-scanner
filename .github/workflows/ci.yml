@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.98.1
+      - name: Start fixture database (deliberately vulnerable + secure schemas)
+        run: supabase start --workdir fixtures -x studio,imgproxy,vector,logflare,supavisor,realtime,mailpit,edge-runtime
+
+      - name: Unit + integration tests
+        run: |
+          eval "$(supabase status --workdir fixtures -o env | grep -E '^(ANON_KEY|PUBLISHABLE_KEY|API_URL)=')"
+          SCANNER_TEST_DB_URL=postgresql://postgres:postgres@127.0.0.1:55322/postgres \
+          SCANNER_TEST_API_URL="$API_URL" \
+          SCANNER_TEST_ANON_KEY="$ANON_KEY" \
+          SCANNER_TEST_PUBLISHABLE_KEY="$PUBLISHABLE_KEY" \
+          npm test
+
+      # Dogfood the published action on the fixtures; it must find issues without failing this job.
+      - name: Run the action against the fixtures
+        id: scan
+        uses: ./
+        with:
+          db-url: postgresql://postgres:postgres@127.0.0.1:55322/postgres
+          schemas: vuln,public
+          migrations: fixtures/supabase/migrations
+          fail-on: none
+      - name: SARIF report has the expected findings
+        run: |
+          count=$(jq '.runs[0].results | length' "${{ steps.scan.outputs.sarif-file }}")
+          echo "findings: $count"
+          test "$count" -eq 9

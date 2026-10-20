@@ -1,0 +1,47 @@
+{
+  "name": "supabase-security-scanner",
+  "version": "0.1.0",
+  "description": "Find RLS gaps, unsafe SECURITY DEFINER functions, leaked service keys and other Supabase misconfigurations before they ship.",
+  "type": "module",
+  "bin": {
+    "supabase-scan": "dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "scan": "node dist/cli.js",
+    "prepare": "npm run build"
+  },
+  "keywords": [
+    "supabase",
+    "postgres",
+    "security",
+    "rls",
+    "row-level-security",
+    "sast",
+    "sarif",
+    "cli"
+  ],
+  "author": "Alexandre Cavalcante",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AlexandreCavalcantee/supabase-security-scanner.git"
+  },
+  "dependencies": {
+    "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "@types/pg": "^8.23.1",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.12"
+  }
+}

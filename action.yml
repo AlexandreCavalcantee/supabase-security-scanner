@@ -1,0 +1,64 @@
+name: Supabase Security Scanner
+description: Find RLS gaps, unsafe SECURITY DEFINER functions, public buckets and leaked keys in a Supabase project.
+author: Alexandre Cavalcante
+branding:
+  icon: shield
+  color: green
+
+inputs:
+  command:
+    description: "db, bundle or probe"
+    default: db
+  db-url:
+    description: "Postgres connection string (db command). In CI, usually the local stack from `supabase db start`."
+    default: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+  schemas:
+    description: "Comma-separated schemas exposed through the Data API"
+    default: public
+  migrations:
+    description: "Migrations folder, used to point findings at the SQL line that caused them"
+    default: supabase/migrations
+  url:
+    description: "Site URL (bundle) or project URL (probe)"
+    default: ""
+  anon-key:
+    description: "Public anon/publishable key (probe)"
+    default: ""
+  fail-on:
+    description: "Fail the step at this severity or above (critical, high, medium, low, info, none)"
+    default: high
+  sarif-file:
+    description: "Where to write the SARIF report (upload it with github/codeql-action/upload-sarif)"
+    default: supabase-scan.sarif
+
+outputs:
+  sarif-file:
+    description: Path of the SARIF report
+    value: ${{ inputs.sarif-file }}
+
+runs:
+  using: composite
+  steps:
+    - name: Build scanner
+      shell: bash
+      run: |
+        cd "$GITHUB_ACTION_PATH"
+        npm ci --no-audit --no-fund --silent
+        npm run build --silent
+
+    - name: Scan
+      shell: bash
+      # Inputs go through env, never straight into the script.
+      env:
+        COMMAND: ${{ inputs.command }}
+        SUPABASE_DB_URL: ${{ inputs.db-url }}
+        SCHEMAS: ${{ inputs.schemas }}
+        MIGRATIONS: ${{ inputs.migrations }}
+        TARGET_URL: ${{ inputs.url }}
+        SUPABASE_ANON_KEY: ${{ inputs.anon-key }}
+        FAIL_ON: ${{ inputs.fail-on }}
+        SARIF_FILE: ${{ inputs.sarif-file }}
+      run: |
+        args=("$COMMAND" --schemas "$SCHEMAS" --migrations "$MIGRATIONS" --fail-on "$FAIL_ON" --format sarif --output "$SARIF_FILE")
+        if [ -n "$TARGET_URL" ]; then args+=(--url "$TARGET_URL"); fi
+        node "$GITHUB_ACTION_PATH/dist/cli.js" "${args[@]}"
